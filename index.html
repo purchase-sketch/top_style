@@ -5,40 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Top Style Pivot Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <!-- Select2 for Professional Multi-select Dropdowns -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
     <style>
         :root { --p: #4f46e5; --bg: #f3f4f6; --tx: #1f2937; --bd: #d1d5db; --blue-light: #eef2ff; --blue-dark: #3730a3; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 20px; font-size: 13px; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 15px; font-size: 13px; }
         
-        .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        
-        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--bd); padding-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+        .card { background: #fff; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--bd); padding-bottom: 10px; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
         .header-top h1 { font-size: 1.2rem; margin: 0; }
         
-        .btn-group { display: flex; gap: 8px; }
-        .action-btn { color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .action-btn { color: #fff; text-decoration: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; }
         .btn-upload { background: var(--p); }
         .btn-excel { background: #10b981; }
         .btn-pdf { background: #ef4444; }
         .action-btn:hover { opacity: 0.9; }
         
-        .pivot-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; padding: 15px; background: #f8fafc; border: 1px solid var(--bd); border-radius: 6px; }
-        .pivot-options label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; background: #fff; padding: 5px 10px; border: 1px solid var(--bd); border-radius: 4px; }
+        /* Filter Bar Styling */
+        .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+        .filter-bar input { padding: 8px 12px; border: 1px solid var(--bd); border-radius: 6px; font-size: 0.9rem; min-width: 220px; }
+        .btn-filter-toggle { background: #fff; color: var(--tx); border: 1px solid var(--bd); padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-apply-filters { background: var(--p); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-reset { background: #f43f5e; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        
+        /* Dependent Filter Panel */
+        .filter-panel { display: none; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 15px; background: #f8fafc; border: 1px solid var(--bd); border-radius: 6px; margin-bottom: 15px; }
+        .filter-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: #4b5563; }
+        .select2-container { width: 100% !important; }
+
+        /* Pivot Options Styling */
+        .pivot-title { font-weight: 700; margin-bottom: 8px; color: var(--blue-dark); font-size: 0.95rem; }
+        .pivot-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: #fff; border: 1px solid var(--bd); border-radius: 6px; }
+        .pivot-options label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 4px; background: #f9fafb; }
         .pivot-options label:hover { background: var(--blue-light); }
-        .btn-apply { background: var(--blue-dark); color: #fff; border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; font-size: 1rem; }
         
         .table-wrap { overflow-x: auto; border: 1px solid var(--bd); border-radius: 4px; }
         table { width: 100%; border-collapse: collapse; background: #fff; }
-        
         th { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; text-align: left; padding: 10px; border: 1px solid var(--bd); font-size: 0.85rem; white-space: nowrap; }
         td { padding: 8px 10px; border: 1px solid var(--bd); vertical-align: middle; color: #4b5563; white-space: nowrap; }
-        
         .grp-cell { background: var(--blue-light); color: var(--blue-dark); font-weight: 600; vertical-align: top; }
         .subtotal-row td { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; }
         .num { text-align: right; font-weight: 600; }
-        .loading { text-align: center; padding: 30px; font-weight: bold; color: var(--p); font-size: 1.1rem; }
+        .loading { text-align: center; padding: 20px; font-weight: bold; color: var(--p); font-size: 1rem; }
     </style>
     
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -55,9 +73,21 @@
         </div>
     </div>
 
-    <div><strong>Grouping Columns (Tick karein):</strong></div>
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <input type="text" id="dateRange" placeholder="Select Date Range...">
+        <button class="btn-filter-toggle" onclick="$('#filterPanel').slideToggle()">Filters ▾</button>
+        <button class="btn-apply-filters" onclick="applyFiltersAndPivot()">Apply Everything</button>
+        <button class="btn-reset" onclick="resetFilters()">Reset</button>
+    </div>
+
+    <!-- Dependent Dropdown Panel -->
+    <div class="filter-panel" id="filterPanel">
+        <!-- Generates from JS -->
+    </div>
+
+    <div class="pivot-title">Grouping Columns (Tick karein):</div>
     <div class="pivot-options" id="pivot-checkboxes"></div>
-    <button class="btn-apply" onclick="applyPivot()">Apply Pivot</button>
 </div>
 
 <div class="card">
@@ -77,7 +107,7 @@
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Article Name ko bhi ab options me daal diya gaya hai
+    // Filter AND Pivot Columns
     const ALL_COLS = [
         { id: 'location_alias', label: 'Location Alias' },
         { id: 'section_name', label: 'Section Name' },
@@ -90,66 +120,115 @@
         { id: 'sub_price_range', label: 'Sub Price Range' },
         { id: 'sub_major_category', label: 'Sub Major Category' },
         { id: 'brand_name', label: 'Brand Name' },
+        { id: 'style_name', label: 'Style Name' }, // Style is filterable too
         { id: 'fabric', label: 'Fabric' },
-        { id: 'size_name', label: 'Size Name' },
-        { id: 'color_name', label: 'Color Name' }
+        { id: 'size_name', label: 'Size Name' }
     ];
 
     let rawData = [];
+    let fpInstance;
 
     window.addEventListener('DOMContentLoaded', async () => {
+        // Initialize Datepicker
+        fpInstance = flatpickr("#dateRange", { mode: "range", dateFormat: "Y-m-d" });
+
+        // Initialize Pivot Checkboxes
         const chkContainer = document.getElementById('pivot-checkboxes');
-        // Default me ab 'Major Category' set kiya hai (Aapko jo chahiye wo automatic tick milega)
         const defaults = ['major_category']; 
         
         ALL_COLS.forEach(col => {
-            const isChecked = defaults.includes(col.id) ? 'checked' : '';
-            chkContainer.innerHTML += `
-                <label>
-                    <input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked}> 
-                    ${col.label}
-                </label>
-            `;
+            if(col.id !== 'style_name') { // Style Name Pivot box me mat dikhao, wo fix child hai
+                const isChecked = defaults.includes(col.id) ? 'checked' : '';
+                chkContainer.innerHTML += `
+                    <label><input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked}> ${col.label}</label>
+                `;
+            }
         });
 
-        fetchFullData();
+        // Initialize Dependent Dropdowns UI
+        const filterPanel = document.getElementById('filterPanel');
+        ALL_COLS.forEach(col => {
+            filterPanel.innerHTML += `
+                <div class="filter-group">
+                    <label>${col.label}</label>
+                    <select id="flt_${col.id}" class="multi-select" multiple="multiple" data-col="${col.id}"></select>
+                </div>
+            `;
+        });
+        $('.multi-select').select2({ placeholder: "All", allowClear: true });
+        
+        // Trigger Dependent Options updates on change
+        $('.multi-select').on('change', function() { updateDropdownOptions(); });
+
+        await fetchFullData();
     });
 
     async function fetchFullData() {
         const msg = document.getElementById('load-msg');
         let allData = [];
-        let from = 0;
-        let step = 1000;
-        let fetchMore = true;
+        let from = 0; let step = 1000; let fetchMore = true;
 
         try {
             while (fetchMore) {
-                const { data, error } = await supabaseClient
-                    .from('sales_stock')
-                    .select('*')
-                    .range(from, from + step - 1);
-
+                const { data, error } = await supabaseClient.from('sales_stock').select('*').range(from, from + step - 1);
                 if (error) throw error;
-
                 if (data && data.length > 0) {
                     allData = allData.concat(data);
-                    msg.innerText = `Data load ho raha hai... Please wait. (${allData.length} rows fetched)`;
+                    msg.innerText = `Data fetching... (${allData.length} rows)`;
                     from += step;
-                    if (data.length < step) {
-                        fetchMore = false; 
-                    }
-                } else {
-                    fetchMore = false;
-                }
+                    if (data.length < step) fetchMore = false; 
+                } else { fetchMore = false; }
             }
             rawData = allData;
-            applyPivot(); 
+            
+            // Ab dropdown options populate karo initial data se
+            updateDropdownOptions(true);
+            applyFiltersAndPivot(); 
         } catch (err) {
             document.getElementById('table-body').innerHTML = `<tr><td class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
         }
     }
 
-    function applyPivot() {
+    // Dependent Filter Logic (Cascading)
+    function updateDropdownOptions(isFirstLoad = false) {
+        let currentFilteredData = rawData;
+
+        // Agar first load nahi hai, to pehle current selections check karo
+        if (!isFirstLoad) {
+            ALL_COLS.forEach(col => {
+                let selectedVals = $(`#flt_${col.id}`).val() || [];
+                if (selectedVals.length > 0) {
+                    currentFilteredData = currentFilteredData.filter(r => selectedVals.includes(r[col.id]));
+                }
+            });
+        }
+
+        // Dropdowns options refresh karo available data ke hisaab se
+        ALL_COLS.forEach(col => {
+            let selectElem = $(`#flt_${col.id}`);
+            let currentSelected = selectElem.val() || [];
+            
+            // Get unique values from filtered data
+            let uniqueVals = [...new Set(currentFilteredData.map(item => item[col.id]).filter(v => v))].sort();
+            
+            selectElem.empty();
+            uniqueVals.forEach(val => {
+                let isSelected = currentSelected.includes(val) ? 'selected' : '';
+                let option = new Option(val, val, false, isSelected !== '');
+                selectElem.append(option);
+            });
+            selectElem.trigger('change.select2'); // update UI
+        });
+    }
+
+    function resetFilters() {
+        fpInstance.clear();
+        $('.multi-select').val(null).trigger('change');
+        updateDropdownOptions(true);
+        applyFiltersAndPivot();
+    }
+
+    function applyFiltersAndPivot() {
         const tbody = document.getElementById('table-body');
         const thead = document.getElementById('table-head');
         
@@ -158,40 +237,58 @@
             return;
         }
 
+        // Apply Date Range
+        let finalData = rawData;
+        const dates = fpInstance.selectedDates;
+        if (dates.length === 2) {
+            // Fix timezone formatting
+            const startD = dates[0].toLocaleDateString('en-CA'); 
+            const endD = dates[1].toLocaleDateString('en-CA');
+            finalData = finalData.filter(r => r.report_date >= startD && r.report_date <= endD);
+        }
+
+        // Apply Dropdown Filters
+        ALL_COLS.forEach(col => {
+            let selectedVals = $(`#flt_${col.id}`).val() || [];
+            if (selectedVals.length > 0) {
+                finalData = finalData.filter(r => selectedVals.includes(r[col.id]));
+            }
+        });
+
+        if (finalData.length === 0) {
+             tbody.innerHTML = '<tr><td class="loading">Is filter ke hisaab se koi data nahi mila.</td></tr>';
+             thead.innerHTML = '';
+             return;
+        }
+
+        // Pivot Logic (Grouping)
         const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
         if (checkedBoxes.length === 0) {
-            tbody.innerHTML = '<tr><td class="loading">Kam se kam ek column tick karein!</td></tr>';
+            tbody.innerHTML = '<tr><td class="loading">Kam se kam ek Pivot Box tick karein!</td></tr>';
             return;
         }
 
         const groupCols = checkedBoxes.map(cb => cb.value);
         const groupLabels = checkedBoxes.map(cb => cb.getAttribute('data-label'));
 
-        // Step 1: Dynamic columns aur Style Name ke hisaab se saara data sum karna
         let aggregated = {};
-        rawData.forEach(row => {
+        finalData.forEach(row => {
             let keyObj = {};
-            // Jo tick kiya hai sirf wahi group hoga
             groupCols.forEach(col => keyObj[col] = row[col] || '-');
-            
-            // Style Name hamesha child rahega
             keyObj['style_name'] = row.style_name || '-';
 
             let keyStr = JSON.stringify(keyObj);
-            if (!aggregated[keyStr]) {
-                aggregated[keyStr] = { ...keyObj, sls: 0, cbs: 0 };
-            }
+            if (!aggregated[keyStr]) { aggregated[keyStr] = { ...keyObj, sls: 0, cbs: 0 }; }
             aggregated[keyStr].sls += Number(row.net_sls_qty) || 0;
             aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
         });
 
-        // Step 2: Parent groups banana
         let parentGroups = {};
         Object.values(aggregated).forEach(row => {
             let parentKeyObj = {};
             groupCols.forEach(col => parentKeyObj[col] = row[col]);
-            
             let parentKeyStr = JSON.stringify(parentKeyObj);
+            
             if (!parentGroups[parentKeyStr]) {
                 parentGroups[parentKeyStr] = { keys: parentKeyObj, styles: [], total_sls: 0, total_cbs: 0 };
             }
@@ -215,13 +312,13 @@
             return JSON.stringify(a.keys).localeCompare(JSON.stringify(b.keys));
         });
 
-        // Step 4: Table header banana
+        // Table headers Generate
         let headHtml = '<tr>';
         groupLabels.forEach(lbl => headHtml += `<th>${lbl}</th>`);
         headHtml += `<th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
         thead.innerHTML = headHtml;
 
-        // Step 5: Table Rows banana
+        // Table Rows Generate
         let bodyHtml = '';
         finalGroups.forEach(pg => {
             let rowCount = pg.styles.length;
@@ -229,21 +326,17 @@
 
             pg.styles.forEach((styleRow, index) => {
                 bodyHtml += `<tr>`;
-                
-                // Sirf tick kiye hue columns merge (rowspan) honge
                 if (index === 0) {
                     groupCols.forEach(col => {
                         bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys[col]}</td>`;
                     });
                 }
-                
                 bodyHtml += `<td>${styleRow.style_name}</td>`;
                 bodyHtml += `<td class="num">${styleRow.sls}</td>`;
                 bodyHtml += `<td class="num">${styleRow.cbs}</td>`;
                 bodyHtml += `</tr>`;
             });
 
-            // Subtotal Line
             let colspan = groupCols.length; 
             bodyHtml += `<tr class="subtotal-row">
                 <td colspan="${colspan}">SUBTOTAL</td>
@@ -267,12 +360,8 @@
         const doc = new jsPDF('l', 'pt', 'a4');
         doc.text("Top 10 Style Pivot Report", 40, 30);
         doc.autoTable({
-            html: '#dataTable',
-            startY: 40,
-            theme: 'grid',
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [55, 48, 163] },
-            alternateRowStyles: { fillColor: [238, 242, 255] }
+            html: '#dataTable', startY: 40, theme: 'grid', styles: { fontSize: 8 },
+            headStyles: { fillColor: [55, 48, 163] }, alternateRowStyles: { fillColor: [238, 242, 255] }
         });
         doc.save('Top_Style_Dashboard.pdf');
     }
