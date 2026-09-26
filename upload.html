@@ -33,6 +33,34 @@
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Date Format Converter (DD-MM-YY / DD-MM-YYYY / DD/MM/YYYY to YYYY-MM-DD)
+    function parseDateToISO(dateStr) {
+        if (!dateStr) return null;
+        dateStr = dateStr.trim();
+        
+        // Agar pehle se YYYY-MM-DD hai
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+
+        // Splitting by '-', '/', or '.'
+        let parts = dateStr.split(/[-/.]/);
+        if (parts.length === 3) {
+            let day = parts[0].padStart(2, '0');
+            let month = parts[1].padStart(2, '0');
+            let year = parts[2];
+
+            // 2-digit year (jaise 26) ko 2026 banana
+            if (year.length === 2) {
+                year = '20' + year;
+            }
+
+            // Return in YYYY-MM-DD format
+            if (year.length === 4) {
+                return `${year}-${month}-${day}`;
+            }
+        }
+        return dateStr; // fallback
+    }
+
     async function uploadData() {
         const btn = document.getElementById('uploadBtn');
         const status = document.getElementById('status');
@@ -51,18 +79,15 @@
         const rows = rawData.split('\n');
         const insertData = [];
         
-        // Agar pehli line me header (Location Alias) hai, toh usko skip (1) karenge, nahi toh 0 se shuru
         let startIndex = rows[0].toLowerCase().includes('location alias') ? 1 : 0;
 
         for (let i = startIndex; i < rows.length; i++) {
             const cols = rows[i].split('\t').map(c => c.trim());
             
-            // Ab check karega ki 18 columns hain ya nahi (kyunki report_date add ho gaya hai)
             if (cols.length < 18) continue; 
 
-            // Date format Excel se aayega, usko format karna zaruri hai (DD-MM-YYYY ya YYYY-MM-DD)
-            // Agar Excel date proper format me bhejta hai toh theek, warna Supabase automatically handle karne ki koshish karega
-            let parsedDate = cols[17];
+            // Date Convert Kar Rahe Hain
+            let parsedDate = parseDateToISO(cols[17]);
 
             insertData.push({
                 location_alias: cols[0],
@@ -82,12 +107,12 @@
                 color_name: cols[14],
                 net_sls_qty: parseFloat(cols[15]) || 0,
                 cbs_qty: parseFloat(cols[16]) || 0,
-                report_date: parsedDate  // Date ab seedha Excel ke last column se aayegi
+                report_date: parsedDate
             });
         }
 
         if (insertData.length === 0) {
-            status.textContent = "Koi valid data nahi mila! 18 columns theek se copy karo.";
+            status.textContent = "Koi valid data nahi mila! 18 columns check karo.";
             status.style.color = "red";
             btn.disabled = false;
             return;
