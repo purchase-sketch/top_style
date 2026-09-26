@@ -6,8 +6,6 @@
     <title>Top Style Pivot Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    
-    <!-- Select2 for Professional Multi-select Dropdowns -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     
     <style>
@@ -82,9 +80,7 @@
     </div>
 
     <!-- Dependent Dropdown Panel -->
-    <div class="filter-panel" id="filterPanel">
-        <!-- Generates from JS -->
-    </div>
+    <div class="filter-panel" id="filterPanel"></div>
 
     <div class="pivot-title">Grouping Columns (Tick karein):</div>
     <div class="pivot-options" id="pivot-checkboxes"></div>
@@ -107,7 +103,6 @@
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Filter AND Pivot Columns
     const ALL_COLS = [
         { id: 'location_alias', label: 'Location Alias' },
         { id: 'section_name', label: 'Section Name' },
@@ -127,12 +122,11 @@
 
     let rawData = [];
     let fpInstance;
+    let isUpdatingDropdowns = false;
 
     window.addEventListener('DOMContentLoaded', async () => {
-        // Initialize Datepicker
         fpInstance = flatpickr("#dateRange", { mode: "range", dateFormat: "Y-m-d" });
 
-        // Initialize Pivot Checkboxes
         const chkContainer = document.getElementById('pivot-checkboxes');
         const defaults = ['major_category']; 
         
@@ -145,7 +139,6 @@
             }
         });
 
-        // Initialize Dependent Dropdowns UI
         const filterPanel = document.getElementById('filterPanel');
         ALL_COLS.forEach(col => {
             filterPanel.innerHTML += `
@@ -155,18 +148,21 @@
                 </div>
             `;
         });
+
         $('.multi-select').select2({ placeholder: "All", allowClear: true });
         
-        // Trigger Dependent Options updates on change
-        $('.multi-select').on('change', function() { updateDropdownOptions(); });
+        $('.multi-select').on('change', function() { 
+            if (!isUpdatingDropdowns) {
+                updateDropdownOptions(); 
+            }
+        });
 
         await fetchFullData();
     });
 
-    // ⚡ Fast Data Fetching using Database RPC Function
     async function fetchFullData() {
         const msg = document.getElementById('load-msg');
-        msg.innerText = "Fast Data Loading...";
+        msg.innerText = "Data Load Ho Raha Hai...";
 
         let startD = null, endD = null;
         const dates = fpInstance.selectedDates;
@@ -176,7 +172,6 @@
         }
 
         try {
-            // Direct RPC function call (Aggregated summary pehle se tayar milti hai)
             const { data, error } = await supabaseClient.rpc('get_pivot_summary', {
                 p_start_date: startD,
                 p_end_date: endD
@@ -192,8 +187,8 @@
         }
     }
 
-    // Dependent Filter Logic (Cascading)
     function updateDropdownOptions(isFirstLoad = false) {
+        isUpdatingDropdowns = true;
         let currentFilteredData = rawData;
 
         if (!isFirstLoad) {
@@ -213,12 +208,13 @@
             
             selectElem.empty();
             uniqueVals.forEach(val => {
-                let isSelected = currentSelected.includes(val) ? 'selected' : '';
-                let option = new Option(val, val, false, isSelected !== '');
+                let isSelected = currentSelected.includes(val);
+                let option = new Option(val, val, false, isSelected);
                 selectElem.append(option);
             });
-            selectElem.trigger('change.select2');
+            selectElem.val(currentSelected).trigger('change.select2');
         });
+        isUpdatingDropdowns = false;
     }
 
     function resetFilters() {
@@ -238,7 +234,7 @@
 
         let finalData = rawData;
 
-        // Apply Dropdown Filters
+        // Apply Multi-select Dropdown Filters
         ALL_COLS.forEach(col => {
             let selectedVals = $(`#flt_${col.id}`).val() || [];
             if (selectedVals.length > 0) {
@@ -289,26 +285,22 @@
 
         let finalGroups = Object.values(parentGroups);
         
-        // 3a. INNER SORTING: Top 10 Styles Highest to Lowest
         finalGroups.forEach(pg => {
             pg.styles.sort((a, b) => b.sls - a.sls); 
             pg.styles = pg.styles.slice(0, 10); 
         });
 
-        // 3b. OUTER SORTING: Highest Total SLS wala Parent Group sabse upar
         finalGroups.sort((a, b) => {
             let diff = b.total_sls - a.total_sls; 
             if (diff !== 0) return diff;
             return JSON.stringify(a.keys).localeCompare(JSON.stringify(b.keys));
         });
 
-        // Table headers Generate
         let headHtml = '<tr>';
         groupLabels.forEach(lbl => headHtml += `<th>${lbl}</th>`);
         headHtml += `<th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
         thead.innerHTML = headHtml;
 
-        // Table Rows Generate
         let bodyHtml = '';
         finalGroups.forEach(pg => {
             let rowCount = pg.styles.length;
