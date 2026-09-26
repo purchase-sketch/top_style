@@ -3,33 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Top Style Dashboard</title>
+    <title>Top Style Pivot Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --p: #4f46e5; --bg: #f3f4f6; --tx: #1f2937; --bd: #d1d5db; --blue-light: #eef2ff; --blue-dark: #3730a3; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 20px; font-size: 13px; }
         
-        .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 100%; margin: 0 auto; }
+        .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
-        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .header-top h1 { font-size: 1.2rem; margin: 0; display: flex; align-items: center; gap: 8px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--bd); padding-bottom: 10px; }
+        .header-top h1 { font-size: 1.2rem; margin: 0; }
         .upload-btn { background: var(--p); color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; }
+        
+        /* Pivot Options Styling */
+        .pivot-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; padding: 15px; background: #f8fafc; border: 1px solid var(--bd); border-radius: 6px; }
+        .pivot-options label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; background: #fff; padding: 5px 10px; border: 1px solid var(--bd); border-radius: 4px; }
+        .pivot-options label:hover { background: var(--blue-light); }
+        .btn-apply { background: var(--blue-dark); color: #fff; border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; font-size: 1rem; }
         
         .table-wrap { overflow-x: auto; border: 1px solid var(--bd); border-radius: 4px; }
         table { width: 100%; border-collapse: collapse; background: #fff; }
         
-        /* Table Header Styling */
-        th { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; text-align: left; padding: 10px; border: 1px solid var(--bd); font-size: 0.85rem; }
-        td { padding: 8px 10px; border: 1px solid var(--bd); vertical-align: middle; color: #4b5563; }
+        th { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; text-align: left; padding: 10px; border: 1px solid var(--bd); font-size: 0.85rem; white-space: nowrap; }
+        td { padding: 8px 10px; border: 1px solid var(--bd); vertical-align: middle; color: #4b5563; white-space: nowrap; }
         
-        /* Merged Cells Styling (Left side categories) */
         .grp-cell { background: var(--blue-light); color: var(--blue-dark); font-weight: 600; vertical-align: top; }
-        
-        /* Subtotal Row Styling */
         .subtotal-row td { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; }
-        .subtotal-label { text-align: left; }
-        
         .num { text-align: right; font-weight: 600; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: var(--p); font-size: 1.1rem; }
     </style>
@@ -38,121 +38,184 @@
 
 <div class="card">
     <div class="header-top">
-        <h1>🏆 Top 10 Style — Article ke hisaab se</h1>
+        <h1>📊 Pivot: Top 10 Style by Article</h1>
         <a href="upload.html" class="upload-btn">＋ Upload Data</a>
     </div>
-    
+
+    <!-- Tick / Untick Options (Pivot Columns) -->
+    <div><strong>Grouping Columns (Tick karein):</strong></div>
+    <div class="pivot-options" id="pivot-checkboxes">
+        <!-- Columns will be injected here by JS -->
+    </div>
+    <button class="btn-apply" onclick="applyPivot()">Apply Pivot</button>
+</div>
+
+<div class="card">
     <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Major Category</th>
-                    <th>Sub Section Name</th>
-                    <th>Article Name</th>
-                    <th>Brand Name</th>
-                    <th>Style Name</th>
-                    <th class="num">Net SLS Qty</th>
-                    <th class="num">CBS Qty</th>
-                </tr>
+        <table id="dataTable">
+            <thead id="table-head">
+                <!-- Headers dynamically aayenge -->
             </thead>
             <tbody id="table-body">
-                <tr><td colspan="7" class="loading">Data load ho raha hai... Please wait.</td></tr>
+                <tr><td class="loading">Data load ho raha hai... Please wait.</td></tr>
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = 'https://opxkaiksxjuumhgvqtvc.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
-    
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    async function loadData() {
-        const tbody = document.getElementById('table-body');
+    // Saare available columns jo image aur list me hain
+    const ALL_COLS = [
+        { id: 'location_alias', label: 'Location Alias' },
+        { id: 'section_name', label: 'Section Name' },
+        { id: 'department', label: 'Department' },
+        { id: 'sub_section_name', label: 'Sub Section Name' },
+        { id: 'sub_section_2', label: 'Sub Section 2' },
+        { id: 'major_category', label: 'Major Category' },
+        { id: 'price_range', label: 'Price Range' },
+        { id: 'sub_price_range', label: 'Sub Price Range' },
+        { id: 'sub_major_category', label: 'Sub Major Category' },
+        { id: 'brand_name', label: 'Brand Name' },
+        { id: 'fabric', label: 'Fabric' },
+        { id: 'size_name', label: 'Size Name' },
+        { id: 'color_name', label: 'Color Name' }
+    ];
+
+    let rawData = [];
+
+    // Page load par Checkboxes banana aur Data fetch karna
+    window.addEventListener('DOMContentLoaded', async () => {
+        const chkContainer = document.getElementById('pivot-checkboxes');
+        // Default tick: Major Category aur Sub Section (Aap apne hisaab se change kar sakte hain)
+        const defaults = ['major_category', 'sub_section_name']; 
+        
+        ALL_COLS.forEach(col => {
+            const isChecked = defaults.includes(col.id) ? 'checked' : '';
+            chkContainer.innerHTML += `
+                <label>
+                    <input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked}> 
+                    ${col.label}
+                </label>
+            `;
+        });
+
+        // Supabase se raw data fetch karna (sales_stock table se)
         try {
-            // Data fetch kar rahe hain
-            const { data, error } = await supabaseClient
-                .from('top_10_styles')
-                .select('*');
-
+            const { data, error } = await supabaseClient.from('sales_stock').select('*');
             if (error) throw error;
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="loading">Koi data nahi mila. Upar "Upload Data" par click karein.</td></tr>';
-                return;
-            }
-
-            // Data ko Group karne ka logic (Taki Merge aur Subtotal ban sake)
-            let groups = [];
-            let currentKey = null;
-            let currentGroup = null;
-
-            // Ensure data is sorted properly before grouping
-            data.sort((a, b) => {
-                let diff = (a.article_name || '').localeCompare(b.article_name || '');
-                if (diff !== 0) return diff;
-                return (b.sls || 0) - (a.sls || 0);
-            });
-
-            data.forEach(row => {
-                let key = `${row.major_category}|${row.sub_section_name}|${row.article_name}`;
-                if (key !== currentKey) {
-                    currentGroup = {
-                        major_category: row.major_category,
-                        sub_section_name: row.sub_section_name,
-                        article_name: row.article_name,
-                        rows: [],
-                        subtotal_sls: 0,
-                        subtotal_cbs: 0
-                    };
-                    groups.push(currentGroup);
-                    currentKey = key;
-                }
-                currentGroup.rows.push(row);
-                currentGroup.subtotal_sls += (row.sls || 0);
-                currentGroup.subtotal_cbs += (row.cbs || 0);
-            });
-
-            // HTML Generate karna
-            let html = '';
-            groups.forEach(g => {
-                let rowCount = g.rows.length;
-                
-                g.rows.forEach((r, index) => {
-                    html += `<tr>`;
-                    // Pehli row me Major Category, Sub Section aur Article ko Merge (rowspan) kar do
-                    if (index === 0) {
-                        html += `<td rowspan="${rowCount}" class="grp-cell">${g.major_category || '-'}</td>`;
-                        html += `<td rowspan="${rowCount}" class="grp-cell">${g.sub_section_name || '-'}</td>`;
-                        html += `<td rowspan="${rowCount}" class="grp-cell">${g.article_name || '-'}</td>`;
-                    }
-                    // Baki columns normally print honge
-                    html += `<td>${r.brand_name || '-'}</td>`;
-                    html += `<td>${r.style_name || '-'}</td>`;
-                    html += `<td class="num">${r.sls || 0}</td>`;
-                    html += `<td class="num">${r.cbs || 0}</td>`;
-                    html += `</tr>`;
-                });
-
-                // Har group ke baad Subtotal row add karna
-                html += `<tr class="subtotal-row">
-                    <td colspan="5" class="subtotal-label">SUBTOTAL</td>
-                    <td class="num">${g.subtotal_sls}</td>
-                    <td class="num">${g.subtotal_cbs}</td>
-                </tr>`;
-            });
-
-            tbody.innerHTML = html;
-
+            rawData = data || [];
+            applyPivot(); // Pehli baar apne aap pivot apply hoga
         } catch (err) {
-            console.error('Error fetching data:', err);
-            tbody.innerHTML = `<tr><td colspan="7" class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
+            document.getElementById('table-body').innerHTML = `<tr><td class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
         }
-    }
+    });
 
-    window.addEventListener('DOMContentLoaded', loadData);
+    // Pivot Logic
+    function applyPivot() {
+        const tbody = document.getElementById('table-body');
+        const thead = document.getElementById('table-head');
+        
+        if (rawData.length === 0) {
+            tbody.innerHTML = '<tr><td class="loading">Koi data nahi mila. Pehle Upload karein.</td></tr>';
+            return;
+        }
+
+        // Kaun-kaun se box tick hain?
+        const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
+        const groupCols = checkedBoxes.map(cb => cb.value);
+        const groupLabels = checkedBoxes.map(cb => cb.getAttribute('data-label'));
+
+        // Step 1: Raw Data ko Ticked Columns + Article + Style ke basis par Sum karna
+        let aggregated = {};
+        rawData.forEach(row => {
+            let keyObj = {};
+            // Ticked columns
+            groupCols.forEach(col => keyObj[col] = row[col] || '-');
+            // Fix Columns: Article aur Style hamesha rahenge
+            keyObj['article_name'] = row.article_name || '-';
+            keyObj['style_name'] = row.style_name || '-';
+
+            let keyStr = JSON.stringify(keyObj);
+            if (!aggregated[keyStr]) {
+                aggregated[keyStr] = { ...keyObj, sls: 0, cbs: 0 };
+            }
+            aggregated[keyStr].sls += Number(row.net_sls_qty) || 0;
+            aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
+        });
+
+        // Step 2: Hame har Article (aur Ticked columns group) ke andar Top 10 Styles nikalne hain
+        let parentGroups = {};
+        Object.values(aggregated).forEach(row => {
+            let parentKeyObj = {};
+            groupCols.forEach(col => parentKeyObj[col] = row[col]);
+            parentKeyObj['article_name'] = row.article_name;
+            
+            let parentKeyStr = JSON.stringify(parentKeyObj);
+            if (!parentGroups[parentKeyStr]) {
+                parentGroups[parentKeyStr] = { keys: parentKeyObj, styles: [], total_sls: 0, total_cbs: 0 };
+            }
+            parentGroups[parentKeyStr].styles.push(row);
+            parentGroups[parentKeyStr].total_sls += row.sls;
+            parentGroups[parentKeyStr].total_cbs += row.cbs;
+        });
+
+        // Step 3: Har parent group ke andar styles ko SLS ke hisaab se Sort karke Top 10 filter karna
+        let finalGroups = Object.values(parentGroups);
+        finalGroups.forEach(pg => {
+            pg.styles.sort((a, b) => b.sls - a.sls); // Descending order
+            pg.styles = pg.styles.slice(0, 10); // Sirf Top 10
+        });
+
+        // Sort Parent Groups logically (Alphabetical)
+        finalGroups.sort((a, b) => JSON.stringify(a.keys).localeCompare(JSON.stringify(b.keys)));
+
+        // Step 4: Table Headers banana (Ticked Cols + Article + Style + Qty)
+        let headHtml = '<tr>';
+        groupLabels.forEach(lbl => headHtml += `<th>${lbl}</th>`);
+        headHtml += `<th>Article Name</th><th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
+        thead.innerHTML = headHtml;
+
+        // Step 5: Table Rows banana (with Rowspan & Subtotal)
+        let bodyHtml = '';
+        finalGroups.forEach(pg => {
+            let rowCount = pg.styles.length;
+            if (rowCount === 0) return;
+
+            pg.styles.forEach((styleRow, index) => {
+                bodyHtml += `<tr>`;
+                
+                // Pehli row me Grouped Columns aur Article Name par Rowspan lagana
+                if (index === 0) {
+                    groupCols.forEach(col => {
+                        bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys[col]}</td>`;
+                    });
+                    bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys['article_name']}</td>`;
+                }
+
+                // Style Name aur uske numbers
+                bodyHtml += `<td>${styleRow.style_name}</td>`;
+                bodyHtml += `<td class="num">${styleRow.sls}</td>`;
+                bodyHtml += `<td class="num">${styleRow.cbs}</td>`;
+                bodyHtml += `</tr>`;
+            });
+
+            // Subtotal Row
+            let colspan = groupCols.length + 1; // Ticked Cols + Article Name
+            bodyHtml += `<tr class="subtotal-row">
+                <td colspan="${colspan}">SUBTOTAL</td>
+                <td></td>
+                <td class="num">${pg.total_sls}</td>
+                <td class="num">${pg.total_cbs}</td>
+            </tr>`;
+        });
+
+        tbody.innerHTML = bodyHtml;
+    }
 </script>
 
 </body>
