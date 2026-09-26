@@ -7,30 +7,30 @@
     <style>
         body { font-family: 'Inter', sans-serif; background: #f3f4f6; padding: 20px; }
         .card { background: #fff; max-width: 800px; margin: 0 auto; padding: 20px; border-radius: 12px; }
-        textarea { width: 100%; height: 200px; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; }
-        button { background: #4f46e5; color: #fff; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        textarea { width: 100%; height: 200px; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; font-family: monospace; }
+        button { background: #4f46e5; color: #fff; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
         button:disabled { background: #a5b4fc; cursor: wait; }
         .msg { margin-top: 15px; font-weight: bold; }
+        .back-btn { display: inline-block; margin-bottom: 15px; color: #4f46e5; text-decoration: none; font-weight: 600; }
     </style>
 </head>
 <body>
 
 <div class="card">
+    <a href="index.html" class="back-btn">← Back to Dashboard</a>
     <h2>📥 Paste Excel Data Here</h2>
-    <p>Excel se apna data copy karo aur yahan paste kar do (Columns same order me hone chahiye).</p>
+    <p>Excel se apna data copy karo aur yahan paste kar do (Upar diye gaye 17 columns same order me hone chahiye).</p>
     
-    <textarea id="tsvData" placeholder="Excel se copy kiya hua data yahan paste karo..."></textarea>
+    <textarea id="tsvData" placeholder="Location Alias | Section Name | Department | Sub Section Name | Sub Section 2 | Major Category | Article Name | Price Range | Sub Price Range | Sub Major Category | Brand Name | Style Name | Fabric | Size Name | Color Name | Net SLS Qty | CBS Qty"></textarea>
+    
     <button id="uploadBtn" onclick="uploadData()">Upload to Supabase</button>
     <div id="status" class="msg"></div>
 </div>
 
-<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = 'https://opxkaiksxjuumhgvqtvc.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
-    
-    // Yahan bhi supabaseClient kar diya hai
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function uploadData() {
@@ -50,39 +50,47 @@
 
         const rows = rawData.split('\n');
         const insertData = [];
+        let startIndex = rows[0].toLowerCase().includes('location alias') ? 1 : 0;
 
-        for (let i = 1; i < rows.length; i++) {
+        for (let i = startIndex; i < rows.length; i++) {
             const cols = rows[i].split('\t').map(c => c.trim());
-            if (cols.length < 14) continue; 
+            if (cols.length < 17) continue; 
 
             insertData.push({
-                sub_section_name: cols[0],
-                sub_section_2: cols[1],
-                major_category: cols[2],
-                article_name: cols[3],
-                price_range: cols[4],
-                sub_price_range: cols[5],
-                sub_major_category: cols[6],
-                brand_name: cols[7],
-                style_name: cols[8],
-                fabric: cols[9],
-                size_name: cols[10],
-                color_name: cols[11],
-                net_sls_qty: parseFloat(cols[12]) || 0,
-                cbs_qty: parseFloat(cols[13]) || 0
+                location_alias: cols[0],
+                section_name: cols[1],
+                department: cols[2],
+                sub_section_name: cols[3],
+                sub_section_2: cols[4],
+                major_category: cols[5],
+                article_name: cols[6],
+                price_range: cols[7],
+                sub_price_range: cols[8],
+                sub_major_category: cols[9],
+                brand_name: cols[10],
+                style_name: cols[11],
+                fabric: cols[12],
+                size_name: cols[13],
+                color_name: cols[14],
+                net_sls_qty: parseFloat(cols[15]) || 0,
+                cbs_qty: parseFloat(cols[16]) || 0
             });
         }
 
         if (insertData.length === 0) {
-            status.textContent = "Koi valid data nahi mila!";
+            status.textContent = "Koi valid data nahi mila! Columns check karo.";
             status.style.color = "red";
             btn.disabled = false;
             return;
         }
 
         try {
-            const { error } = await supabaseClient.from('sales_stock').insert(insertData);
-            if (error) throw error;
+            const batchSize = 1000;
+            for (let i = 0; i < insertData.length; i += batchSize) {
+                const batch = insertData.slice(i, i + batchSize);
+                const { error } = await supabaseClient.from('sales_stock').insert(batch);
+                if (error) throw error;
+            }
             
             status.textContent = `✅ Success! ${insertData.length} records upload ho gaye.`;
             status.style.color = "green";
