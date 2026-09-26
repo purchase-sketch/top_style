@@ -12,9 +12,15 @@
         
         .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
-        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--bd); padding-bottom: 10px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--bd); padding-bottom: 10px; flex-wrap: wrap; gap: 10px; }
         .header-top h1 { font-size: 1.2rem; margin: 0; }
-        .upload-btn { background: var(--p); color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; }
+        
+        .btn-group { display: flex; gap: 8px; }
+        .action-btn { color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; }
+        .btn-upload { background: var(--p); }
+        .btn-excel { background: #10b981; }
+        .btn-pdf { background: #ef4444; }
+        .action-btn:hover { opacity: 0.9; }
         
         .pivot-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; padding: 15px; background: #f8fafc; border: 1px solid var(--bd); border-radius: 6px; }
         .pivot-options label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; background: #fff; padding: 5px 10px; border: 1px solid var(--bd); border-radius: 4px; }
@@ -32,13 +38,22 @@
         .num { text-align: right; font-weight: 600; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: var(--p); font-size: 1.1rem; }
     </style>
+    
+    <!-- Excel & PDF Download Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
 <div class="card">
     <div class="header-top">
         <h1>📊 Pivot: Top 10 Style by Article</h1>
-        <a href="upload.html" class="upload-btn">＋ Upload Data</a>
+        <div class="btn-group">
+            <button class="action-btn btn-excel" onclick="exportExcel()">⬇ Excel</button>
+            <button class="action-btn btn-pdf" onclick="exportPDF()">⬇ PDF</button>
+            <a href="upload.html" class="action-btn btn-upload">＋ Upload Data</a>
+        </div>
     </div>
 
     <div><strong>Grouping Columns (Tick karein):</strong></div>
@@ -51,7 +66,7 @@
         <table id="dataTable">
             <thead id="table-head"></thead>
             <tbody id="table-body">
-                <tr><td class="loading">Data load ho raha hai... Please wait.</td></tr>
+                <tr><td class="loading" id="load-msg">Data load ho raha hai... Please wait. (0 rows fetched)</td></tr>
             </tbody>
         </table>
     </div>
@@ -95,15 +110,43 @@
             `;
         });
 
+        fetchFullData();
+    });
+
+    // 1000 Rows ki limit hatane ke liye loop me saara data fetch karenge
+    async function fetchFullData() {
+        const msg = document.getElementById('load-msg');
+        let allData = [];
+        let from = 0;
+        let step = 1000;
+        let fetchMore = true;
+
         try {
-            const { data, error } = await supabaseClient.from('sales_stock').select('*');
-            if (error) throw error;
-            rawData = data || [];
+            while (fetchMore) {
+                const { data, error } = await supabaseClient
+                    .from('sales_stock')
+                    .select('*')
+                    .range(from, from + step - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allData = allData.concat(data);
+                    msg.innerText = `Data load ho raha hai... Please wait. (${allData.length} rows fetched)`;
+                    from += step;
+                    if (data.length < step) {
+                        fetchMore = false; 
+                    }
+                } else {
+                    fetchMore = false;
+                }
+            }
+            rawData = allData;
             applyPivot(); 
         } catch (err) {
             document.getElementById('table-body').innerHTML = `<tr><td class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
         }
-    });
+    }
 
     function applyPivot() {
         const tbody = document.getElementById('table-body');
@@ -168,14 +211,12 @@
 
             pg.styles.forEach((styleRow, index) => {
                 bodyHtml += `<tr>`;
-                
                 if (index === 0) {
                     groupCols.forEach(col => {
                         bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys[col]}</td>`;
                     });
                     bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys['article_name']}</td>`;
                 }
-
                 bodyHtml += `<td>${styleRow.style_name}</td>`;
                 bodyHtml += `<td class="num">${styleRow.sls}</td>`;
                 bodyHtml += `<td class="num">${styleRow.cbs}</td>`;
@@ -192,6 +233,33 @@
         });
 
         tbody.innerHTML = bodyHtml;
+    }
+
+    // EXCEL DOWNLOAD FUNCTION
+    function exportExcel() {
+        let table = document.getElementById("dataTable");
+        let wb = XLSX.utils.table_to_book(table, {sheet: "Top 10 Styles"});
+        XLSX.writeFile(wb, "Top_Style_Dashboard.xlsx");
+    }
+
+    // PDF DOWNLOAD FUNCTION
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        // l = landscape mode taki wide table theek se aaye
+        const doc = new jsPDF('l', 'pt', 'a4');
+        
+        doc.text("Top 10 Style Pivot Report", 40, 30);
+        
+        doc.autoTable({
+            html: '#dataTable',
+            startY: 40,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [55, 48, 163] },
+            alternateRowStyles: { fillColor: [238, 242, 255] }
+        });
+        
+        doc.save('Top_Style_Dashboard.pdf');
     }
 </script>
 
