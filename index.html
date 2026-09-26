@@ -31,7 +31,7 @@
         
         .filter-panel { display: none; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 15px; background: #f8fafc; border: 1px solid var(--bd); border-radius: 6px; margin-bottom: 15px; }
         .filter-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: #4b5563; }
-        .filter-group select { width: 100%; padding: 6px; border: 1px solid var(--bd); border-radius: 4px; background: #fff; height: 100px; }
+        .filter-group select { width: 100%; padding: 6px; border: 1px solid var(--bd); border-radius: 4px; background: #fff; height: 90px; }
 
         .pivot-title { font-weight: 700; margin-bottom: 8px; color: var(--blue-dark); font-size: 0.95rem; }
         .pivot-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: #fff; border: 1px solid var(--bd); border-radius: 6px; }
@@ -69,11 +69,11 @@
     <div class="filter-bar">
         <input type="text" id="dateRange" placeholder="Select Date Range...">
         <button class="btn-filter-toggle" onclick="toggleFilters()">Filters ▾</button>
-        <button class="btn-apply-filters" onclick="fetchFullData()">Apply Everything</button>
+        <button class="btn-apply-filters" onclick="fetchAndRender()">Apply Everything</button>
         <button class="btn-reset" onclick="resetFilters()">Reset</button>
     </div>
 
-    <!-- Dependent Multi-select Filter Panel -->
+    <!-- Filter Panel -->
     <div class="filter-panel" id="filterPanel"></div>
 
     <div class="pivot-title">Grouping Columns (Tick / Untick Karein):</div>
@@ -125,7 +125,7 @@
     window.addEventListener('DOMContentLoaded', async () => {
         fpInstance = flatpickr("#dateRange", { mode: "range", dateFormat: "Y-m-d" });
 
-        // Pivot Checkboxes Init
+        // Build Checkboxes
         const chkContainer = document.getElementById('pivot-checkboxes');
         const defaults = ['major_category']; 
         
@@ -133,79 +133,86 @@
             if(col.id !== 'style_name') { 
                 const isChecked = defaults.includes(col.id) ? 'checked' : '';
                 chkContainer.innerHTML += `
-                    <label><input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked} onchange="applyFiltersAndPivot()"> ${col.label}</label>
+                    <label><input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked} onchange="processAndRenderTable()"> ${col.label}</label>
                 `;
             }
         });
 
-        // Filters Panel Init
+        // Build Filters
         const filterPanel = document.getElementById('filterPanel');
         ALL_COLS.forEach(col => {
             filterPanel.innerHTML += `
                 <div class="filter-group">
-                    <label>${col.label} (Ctrl + Click for Multi)</label>
-                    <select id="flt_${col.id}" multiple class="filter-select" onchange="updateDropdownOptions(false)"></select>
+                    <label>${col.label} (Ctrl+Click)</label>
+                    <select id="flt_${col.id}" multiple class="filter-select" onchange="filterDropdownCascading('${col.id}')"></select>
                 </div>
             `;
         });
 
-        await fetchFullData();
+        await fetchAndRender();
     });
 
-    async function fetchFullData() {
+    // Main Fetch Function
+    async function fetchAndRender() {
         const msg = document.getElementById('load-msg');
-        msg.innerText = "Data Load Ho Raha Hai...";
+        msg.innerText = "Data load ho raha hai...";
 
-        let startD = null, endD = null;
+        let query = supabaseClient.from('sales_stock').select('*');
+
+        // Date Range
         const dates = fpInstance.selectedDates;
         if (dates.length === 2) {
-            startD = dates[0].toLocaleDateString('en-CA');
-            endD = dates[1].toLocaleDateString('en-CA');
+            const startD = dates[0].toLocaleDateString('en-CA');
+            const endD = dates[1].toLocaleDateString('en-CA');
+            query = query.gte('report_date', startD).lte('report_date', endD);
         }
 
         try {
-            const { data, error } = await supabaseClient.rpc('get_pivot_summary', {
-                p_start_date: startD,
-                p_end_date: endD
-            });
+            // Fetch All Batching
+            let allRows = [];
+            let from = 0;
+            let step = 1000;
+            let hasMore = true;
 
-            if (error) throw error;
+            while (hasMore) {
+                let { data, error } = await query.range(from, from + step - 1);
+                if (error) throw error;
+                if (data && data.length > 0) {
+                    allRows = allRows.concat(data);
+                    from += step;
+                    if (data.length < step) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            }
 
-            rawData = data || [];
-            updateDropdownOptions(true);
-            applyFiltersAndPivot(); 
+            rawData = allRows;
+            populateFilterOptions();
+            processAndRenderTable();
         } catch (err) {
             console.error(err);
             document.getElementById('table-body').innerHTML = `<tr><td class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
         }
     }
 
-    function updateDropdownOptions(isFirstLoad = false) {
-        let currentFilteredData = rawData;
-
-        if (!isFirstLoad) {
-            ALL_COLS.forEach(col => {
-                const selectElem = document.getElementById(`flt_${col.id}`);
-                const selectedVals = Array.from(selectElem.selectedOptions).map(opt => opt.value);
-                if (selectedVals.length > 0) {
-                    currentFilteredData = currentFilteredData.filter(r => selectedVals.includes(r[col.id]));
-                }
-            });
-        }
-
+    function populateFilterOptions() {
         ALL_COLS.forEach(col => {
             const selectElem = document.getElementById(`flt_${col.id}`);
-            const selectedVals = Array.from(selectElem.selectedOptions).map(opt => opt.value);
+            const currentSelected = Array.from(selectElem.selectedOptions).map(o => o.value);
             
-            let uniqueVals = [...new Set(currentFilteredData.map(item => item[col.id]).filter(v => v))].sort();
+            let uniqueVals = [...new Set(rawData.map(r => r[col.id]).filter(v => v))].sort();
             
             let html = '';
             uniqueVals.forEach(val => {
-                let isSelected = selectedVals.includes(val) ? 'selected' : '';
-                html += `<option value="${val}" ${isSelected}>${val}</option>`;
+                let isSel = currentSelected.includes(val) ? 'selected' : '';
+                html += `<option value="${val}" ${isSel}>${val}</option>`;
             });
             selectElem.innerHTML = html;
         });
+    }
+
+    function filterDropdownCascading(changedCol) {
+        processAndRenderTable();
     }
 
     function resetFilters() {
@@ -213,38 +220,47 @@
         ALL_COLS.forEach(col => {
             document.getElementById(`flt_${col.id}`).selectedIndex = -1;
         });
-        fetchFullData();
+        fetchAndRender();
     }
 
-    function applyFiltersAndPivot() {
+    function processAndRenderTable() {
         const tbody = document.getElementById('table-body');
         const thead = document.getElementById('table-head');
-        
-        if (rawData.length === 0) {
-            tbody.innerHTML = '<tr><td class="loading">Koi data nahi mila. Pehle Upload karein.</td></tr>';
+
+        if (!rawData || rawData.length === 0) {
+            tbody.innerHTML = '<tr><td class="loading">Koi data nahi mila. Upload karein.</td></tr>';
+            thead.innerHTML = '';
             return;
         }
 
-        let finalData = rawData;
-
-        // Apply Dropdown Filters
+        // 1. Filter rawData according to selected options
+        let filteredData = rawData;
         ALL_COLS.forEach(col => {
             const selectElem = document.getElementById(`flt_${col.id}`);
-            const selectedVals = Array.from(selectElem.selectedOptions).map(opt => opt.value);
+            const selectedVals = Array.from(selectElem.selectedOptions).map(o => o.value);
             if (selectedVals.length > 0) {
-                finalData = finalData.filter(r => selectedVals.includes(r[col.id]));
+                filteredData = filteredData.filter(r => selectedVals.includes(r[col.id]));
             }
         });
 
-        if (finalData.length === 0) {
-             tbody.innerHTML = '<tr><td class="loading">Is filter ke hisaab se koi data nahi mila.</td></tr>';
-             thead.innerHTML = '';
-             return;
+        if (filteredData.length === 0) {
+            tbody.innerHTML = '<tr><td class="loading">Is filter ke hisaab se koi data nahi mila.</td></tr>';
+            thead.innerHTML = '';
+            return;
         }
 
+        // 2. Determine max date for CBS Stock calculation
+        let maxDate = '';
+        filteredData.forEach(r => {
+            if (r.report_date && r.report_date > maxDate) {
+                maxDate = r.report_date;
+            }
+        });
+
+        // 3. Checked Pivot Boxes
         const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
         if (checkedBoxes.length === 0) {
-            tbody.innerHTML = '<tr><td class="loading">Kam se kam ek Pivot Box tick karein!</td></tr>';
+            tbody.innerHTML = '<tr><td class="loading">Kam se kam ek Box Tick karein!</td></tr>';
             thead.innerHTML = '';
             return;
         }
@@ -252,24 +268,32 @@
         const groupCols = checkedBoxes.map(cb => cb.value);
         const groupLabels = checkedBoxes.map(cb => cb.getAttribute('data-label'));
 
+        // 4. Aggregation
         let aggregated = {};
-        finalData.forEach(row => {
+        filteredData.forEach(row => {
             let keyObj = {};
             groupCols.forEach(col => keyObj[col] = row[col] || '-');
             keyObj['style_name'] = row.style_name || '-';
 
             let keyStr = JSON.stringify(keyObj);
-            if (!aggregated[keyStr]) { aggregated[keyStr] = { ...keyObj, sls: 0, cbs: 0 }; }
+            if (!aggregated[keyStr]) {
+                aggregated[keyStr] = { ...keyObj, sls: 0, cbs: 0 };
+            }
+            // SLS is summed across all filtered dates
             aggregated[keyStr].sls += Number(row.net_sls_qty) || 0;
-            aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
+            // CBS is taken ONLY from the latest report_date
+            if (row.report_date === maxDate) {
+                aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
+            }
         });
 
+        // 5. Parent Grouping
         let parentGroups = {};
         Object.values(aggregated).forEach(row => {
             let parentKeyObj = {};
             groupCols.forEach(col => parentKeyObj[col] = row[col]);
             let parentKeyStr = JSON.stringify(parentKeyObj);
-            
+
             if (!parentGroups[parentKeyStr]) {
                 parentGroups[parentKeyStr] = { keys: parentKeyObj, styles: [], total_sls: 0, total_cbs: 0 };
             }
@@ -279,23 +303,27 @@
         });
 
         let finalGroups = Object.values(parentGroups);
-        
+
+        // 6. Sort inner Top 10 by SLS
         finalGroups.forEach(pg => {
-            pg.styles.sort((a, b) => b.sls - a.sls); 
-            pg.styles = pg.styles.slice(0, 10); 
+            pg.styles.sort((a, b) => b.sls - a.sls);
+            pg.styles = pg.styles.slice(0, 10);
         });
 
+        // 7. Sort parent groups by Highest Total SLS
         finalGroups.sort((a, b) => {
-            let diff = b.total_sls - a.total_sls; 
+            let diff = b.total_sls - a.total_sls;
             if (diff !== 0) return diff;
             return JSON.stringify(a.keys).localeCompare(JSON.stringify(b.keys));
         });
 
+        // 8. Render Header
         let headHtml = '<tr>';
         groupLabels.forEach(lbl => headHtml += `<th>${lbl}</th>`);
         headHtml += `<th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
         thead.innerHTML = headHtml;
 
+        // 9. Render Rows
         let bodyHtml = '';
         finalGroups.forEach(pg => {
             let rowCount = pg.styles.length;
@@ -314,7 +342,7 @@
                 bodyHtml += `</tr>`;
             });
 
-            let colspan = groupCols.length; 
+            let colspan = groupCols.length;
             bodyHtml += `<tr class="subtotal-row">
                 <td colspan="${colspan}">SUBTOTAL</td>
                 <td></td>
