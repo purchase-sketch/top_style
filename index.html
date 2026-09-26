@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Top Style Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --p: #4f46e5; --bg: #f3f4f6; --tx: #1f2937; --bd: #e5e7eb; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 20px; }
+        .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin-bottom: 20px; border-bottom: 2px solid var(--bd); padding-bottom: 10px; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { border: 1px solid var(--bd); padding: 10px; text-align: left; }
+        th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; }
+        .num { text-align: right; }
+        .loading { text-align: center; padding: 20px; font-weight: bold; color: var(--p); }
+        .row-group { background: #fafafa; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>🏆 Top 10 Style — Article ke hisaab se</h1>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Major Category</th>
+                    <th>Sub Section Name</th>
+                    <th>Article Name</th>
+                    <th>Brand Name</th>
+                    <th>Style Name</th>
+                    <th class="num">Net SLS Qty</th>
+                    <th class="num">CBS Qty</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <tr><td colspan="7" class="loading" id="statusMsg">Data load ho raha hai...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    // DHYAAN DEIN: Publishable key me '...' ki jagah Supabase se copy karke puri key daalein
+    const SUPABASE_URL = 'https://opxkaiksxjuumhgvqtvc.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_7Go66siqXIHsuEprg...'; // <-- YAHAN PURI KEY DAALEIN
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function loadData() {
+        const tbody = document.getElementById('table-body');
+        try {
+            const { data, error } = await supabase
+                .from('top_10_styles')
+                .select('*');
+
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">Koi data nahi mila</td></tr>';
+                return;
+            }
+
+            let html = '';
+            let currentArticle = null;
+
+            data.forEach(row => {
+                let rowClass = '';
+                if (currentArticle !== row.article_name) {
+                    currentArticle = row.article_name;
+                    rowClass = 'row-group';
+                }
+
+                html += `
+                    <tr class="${rowClass}">
+                        <td>${row.major_category || '-'}</td>
+                        <td>${row.sub_section_name || '-'}</td>
+                        <td>${row.article_name || '-'}</td>
+                        <td>${row.brand_name || '-'}</td>
+                        <td>${row.style_name || '-'}</td>
+                        <td class="num">${row.sls || 0}</td>
+                        <td class="num">${row.cbs || 0}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+        } catch (err) {
+            console.error('Error fetching data:', err);
+            tbody.innerHTML = `<tr><td colspan="7" class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', loadData);
+</script>
+
+</body>
+</html>
