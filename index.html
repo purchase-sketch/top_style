@@ -6,7 +6,6 @@
     <title>Top Style Pivot Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     
     <style>
         :root { --p: #4f46e5; --bg: #f3f4f6; --tx: #1f2937; --bd: #d1d5db; --blue-light: #eef2ff; --blue-dark: #3730a3; }
@@ -24,19 +23,16 @@
         .btn-pdf { background: #ef4444; }
         .action-btn:hover { opacity: 0.9; }
         
-        /* Filter Bar Styling */
         .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
         .filter-bar input { padding: 8px 12px; border: 1px solid var(--bd); border-radius: 6px; font-size: 0.9rem; min-width: 220px; }
         .btn-filter-toggle { background: #fff; color: var(--tx); border: 1px solid var(--bd); padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; }
         .btn-apply-filters { background: var(--p); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
         .btn-reset { background: #f43f5e; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
         
-        /* Dependent Filter Panel */
         .filter-panel { display: none; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 15px; background: #f8fafc; border: 1px solid var(--bd); border-radius: 6px; margin-bottom: 15px; }
         .filter-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: #4b5563; }
-        .select2-container { width: 100% !important; }
+        .filter-group select { width: 100%; padding: 6px; border: 1px solid var(--bd); border-radius: 4px; background: #fff; height: 100px; }
 
-        /* Pivot Options Styling */
         .pivot-title { font-weight: 700; margin-bottom: 8px; color: var(--blue-dark); font-size: 0.95rem; }
         .pivot-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: #fff; border: 1px solid var(--bd); border-radius: 6px; }
         .pivot-options label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 4px; background: #f9fafb; }
@@ -52,8 +48,6 @@
         .loading { text-align: center; padding: 20px; font-weight: bold; color: var(--p); font-size: 1rem; }
     </style>
     
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -74,15 +68,15 @@
     <!-- Filter Bar -->
     <div class="filter-bar">
         <input type="text" id="dateRange" placeholder="Select Date Range...">
-        <button class="btn-filter-toggle" onclick="$('#filterPanel').slideToggle()">Filters ▾</button>
+        <button class="btn-filter-toggle" onclick="toggleFilters()">Filters ▾</button>
         <button class="btn-apply-filters" onclick="fetchFullData()">Apply Everything</button>
         <button class="btn-reset" onclick="resetFilters()">Reset</button>
     </div>
 
-    <!-- Dependent Dropdown Panel -->
+    <!-- Dependent Multi-select Filter Panel -->
     <div class="filter-panel" id="filterPanel"></div>
 
-    <div class="pivot-title">Grouping Columns (Tick karein):</div>
+    <div class="pivot-title">Grouping Columns (Tick / Untick Karein):</div>
     <div class="pivot-options" id="pivot-checkboxes"></div>
 </div>
 
@@ -122,11 +116,16 @@
 
     let rawData = [];
     let fpInstance;
-    let isUpdatingDropdowns = false;
+
+    function toggleFilters() {
+        const panel = document.getElementById('filterPanel');
+        panel.style.display = (panel.style.display === 'grid') ? 'none' : 'grid';
+    }
 
     window.addEventListener('DOMContentLoaded', async () => {
         fpInstance = flatpickr("#dateRange", { mode: "range", dateFormat: "Y-m-d" });
 
+        // Pivot Checkboxes Init
         const chkContainer = document.getElementById('pivot-checkboxes');
         const defaults = ['major_category']; 
         
@@ -134,27 +133,20 @@
             if(col.id !== 'style_name') { 
                 const isChecked = defaults.includes(col.id) ? 'checked' : '';
                 chkContainer.innerHTML += `
-                    <label><input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked}> ${col.label}</label>
+                    <label><input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked} onchange="applyFiltersAndPivot()"> ${col.label}</label>
                 `;
             }
         });
 
+        // Filters Panel Init
         const filterPanel = document.getElementById('filterPanel');
         ALL_COLS.forEach(col => {
             filterPanel.innerHTML += `
                 <div class="filter-group">
-                    <label>${col.label}</label>
-                    <select id="flt_${col.id}" class="multi-select" multiple="multiple" data-col="${col.id}"></select>
+                    <label>${col.label} (Ctrl + Click for Multi)</label>
+                    <select id="flt_${col.id}" multiple class="filter-select" onchange="updateDropdownOptions(false)"></select>
                 </div>
             `;
-        });
-
-        $('.multi-select').select2({ placeholder: "All", allowClear: true });
-        
-        $('.multi-select').on('change', function() { 
-            if (!isUpdatingDropdowns) {
-                updateDropdownOptions(); 
-            }
         });
 
         await fetchFullData();
@@ -183,17 +175,18 @@
             updateDropdownOptions(true);
             applyFiltersAndPivot(); 
         } catch (err) {
+            console.error(err);
             document.getElementById('table-body').innerHTML = `<tr><td class="loading" style="color:red;">Error: ${err.message}</td></tr>`;
         }
     }
 
     function updateDropdownOptions(isFirstLoad = false) {
-        isUpdatingDropdowns = true;
         let currentFilteredData = rawData;
 
         if (!isFirstLoad) {
             ALL_COLS.forEach(col => {
-                let selectedVals = $(`#flt_${col.id}`).val() || [];
+                const selectElem = document.getElementById(`flt_${col.id}`);
+                const selectedVals = Array.from(selectElem.selectedOptions).map(opt => opt.value);
                 if (selectedVals.length > 0) {
                     currentFilteredData = currentFilteredData.filter(r => selectedVals.includes(r[col.id]));
                 }
@@ -201,25 +194,25 @@
         }
 
         ALL_COLS.forEach(col => {
-            let selectElem = $(`#flt_${col.id}`);
-            let currentSelected = selectElem.val() || [];
+            const selectElem = document.getElementById(`flt_${col.id}`);
+            const selectedVals = Array.from(selectElem.selectedOptions).map(opt => opt.value);
             
             let uniqueVals = [...new Set(currentFilteredData.map(item => item[col.id]).filter(v => v))].sort();
             
-            selectElem.empty();
+            let html = '';
             uniqueVals.forEach(val => {
-                let isSelected = currentSelected.includes(val);
-                let option = new Option(val, val, false, isSelected);
-                selectElem.append(option);
+                let isSelected = selectedVals.includes(val) ? 'selected' : '';
+                html += `<option value="${val}" ${isSelected}>${val}</option>`;
             });
-            selectElem.val(currentSelected).trigger('change.select2');
+            selectElem.innerHTML = html;
         });
-        isUpdatingDropdowns = false;
     }
 
     function resetFilters() {
         fpInstance.clear();
-        $('.multi-select').val(null).trigger('change');
+        ALL_COLS.forEach(col => {
+            document.getElementById(`flt_${col.id}`).selectedIndex = -1;
+        });
         fetchFullData();
     }
 
@@ -234,9 +227,10 @@
 
         let finalData = rawData;
 
-        // Apply Multi-select Dropdown Filters
+        // Apply Dropdown Filters
         ALL_COLS.forEach(col => {
-            let selectedVals = $(`#flt_${col.id}`).val() || [];
+            const selectElem = document.getElementById(`flt_${col.id}`);
+            const selectedVals = Array.from(selectElem.selectedOptions).map(opt => opt.value);
             if (selectedVals.length > 0) {
                 finalData = finalData.filter(r => selectedVals.includes(r[col.id]));
             }
@@ -251,6 +245,7 @@
         const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
         if (checkedBoxes.length === 0) {
             tbody.innerHTML = '<tr><td class="loading">Kam se kam ek Pivot Box tick karein!</td></tr>';
+            thead.innerHTML = '';
             return;
         }
 
