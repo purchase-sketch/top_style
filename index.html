@@ -77,7 +77,7 @@
     <div class="filter-bar">
         <input type="text" id="dateRange" placeholder="Select Date Range...">
         <button class="btn-filter-toggle" onclick="$('#filterPanel').slideToggle()">Filters ▾</button>
-        <button class="btn-apply-filters" onclick="applyFiltersAndPivot()">Apply Everything</button>
+        <button class="btn-apply-filters" onclick="fetchFullData()">Apply Everything</button>
         <button class="btn-reset" onclick="resetFilters()">Reset</button>
     </div>
 
@@ -120,7 +120,7 @@
         { id: 'sub_price_range', label: 'Sub Price Range' },
         { id: 'sub_major_category', label: 'Sub Major Category' },
         { id: 'brand_name', label: 'Brand Name' },
-        { id: 'style_name', label: 'Style Name' }, // Style is filterable too
+        { id: 'style_name', label: 'Style Name' },
         { id: 'fabric', label: 'Fabric' },
         { id: 'size_name', label: 'Size Name' }
     ];
@@ -137,7 +137,7 @@
         const defaults = ['major_category']; 
         
         ALL_COLS.forEach(col => {
-            if(col.id !== 'style_name') { // Style Name Pivot box me mat dikhao, wo fix child hai
+            if(col.id !== 'style_name') { 
                 const isChecked = defaults.includes(col.id) ? 'checked' : '';
                 chkContainer.innerHTML += `
                     <label><input type="checkbox" class="pivot-chk" value="${col.id}" data-label="${col.label}" ${isChecked}> ${col.label}</label>
@@ -163,25 +163,28 @@
         await fetchFullData();
     });
 
+    // ⚡ Fast Data Fetching using Database RPC Function
     async function fetchFullData() {
         const msg = document.getElementById('load-msg');
-        let allData = [];
-        let from = 0; let step = 1000; let fetchMore = true;
+        msg.innerText = "Fast Data Loading...";
+
+        let startD = null, endD = null;
+        const dates = fpInstance.selectedDates;
+        if (dates.length === 2) {
+            startD = dates[0].toLocaleDateString('en-CA');
+            endD = dates[1].toLocaleDateString('en-CA');
+        }
 
         try {
-            while (fetchMore) {
-                const { data, error } = await supabaseClient.from('sales_stock').select('*').range(from, from + step - 1);
-                if (error) throw error;
-                if (data && data.length > 0) {
-                    allData = allData.concat(data);
-                    msg.innerText = `Data fetching... (${allData.length} rows)`;
-                    from += step;
-                    if (data.length < step) fetchMore = false; 
-                } else { fetchMore = false; }
-            }
-            rawData = allData;
-            
-            // Ab dropdown options populate karo initial data se
+            // Direct RPC function call (Aggregated summary pehle se tayar milti hai)
+            const { data, error } = await supabaseClient.rpc('get_pivot_summary', {
+                p_start_date: startD,
+                p_end_date: endD
+            });
+
+            if (error) throw error;
+
+            rawData = data || [];
             updateDropdownOptions(true);
             applyFiltersAndPivot(); 
         } catch (err) {
@@ -193,7 +196,6 @@
     function updateDropdownOptions(isFirstLoad = false) {
         let currentFilteredData = rawData;
 
-        // Agar first load nahi hai, to pehle current selections check karo
         if (!isFirstLoad) {
             ALL_COLS.forEach(col => {
                 let selectedVals = $(`#flt_${col.id}`).val() || [];
@@ -203,12 +205,10 @@
             });
         }
 
-        // Dropdowns options refresh karo available data ke hisaab se
         ALL_COLS.forEach(col => {
             let selectElem = $(`#flt_${col.id}`);
             let currentSelected = selectElem.val() || [];
             
-            // Get unique values from filtered data
             let uniqueVals = [...new Set(currentFilteredData.map(item => item[col.id]).filter(v => v))].sort();
             
             selectElem.empty();
@@ -217,15 +217,14 @@
                 let option = new Option(val, val, false, isSelected !== '');
                 selectElem.append(option);
             });
-            selectElem.trigger('change.select2'); // update UI
+            selectElem.trigger('change.select2');
         });
     }
 
     function resetFilters() {
         fpInstance.clear();
         $('.multi-select').val(null).trigger('change');
-        updateDropdownOptions(true);
-        applyFiltersAndPivot();
+        fetchFullData();
     }
 
     function applyFiltersAndPivot() {
@@ -237,15 +236,7 @@
             return;
         }
 
-        // Apply Date Range
         let finalData = rawData;
-        const dates = fpInstance.selectedDates;
-        if (dates.length === 2) {
-            // Fix timezone formatting
-            const startD = dates[0].toLocaleDateString('en-CA'); 
-            const endD = dates[1].toLocaleDateString('en-CA');
-            finalData = finalData.filter(r => r.report_date >= startD && r.report_date <= endD);
-        }
 
         // Apply Dropdown Filters
         ALL_COLS.forEach(col => {
@@ -261,7 +252,6 @@
              return;
         }
 
-        // Pivot Logic (Grouping)
         const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
         if (checkedBoxes.length === 0) {
             tbody.innerHTML = '<tr><td class="loading">Kam se kam ek Pivot Box tick karein!</td></tr>';
