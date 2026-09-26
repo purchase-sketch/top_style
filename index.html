@@ -6,24 +6,32 @@
     <title>Top Style Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --p: #4f46e5; --bg: #f3f4f6; --tx: #1f2937; --bd: #e5e7eb; }
+        :root { --p: #4f46e5; --bg: #f3f4f6; --tx: #1f2937; --bd: #d1d5db; --blue-light: #eef2ff; --blue-dark: #3730a3; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 20px; }
-        .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 1200px; margin: 0 auto; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 20px; font-size: 13px; }
         
-        /* Naya header style banaya gaya hai jisme Upload button hai */
-        .header-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--bd); padding-bottom: 10px; margin-bottom: 20px; }
-        .header-top h1 { font-size: 1.5rem; margin: 0; padding: 0; border: none; }
-        .upload-btn { background: var(--p); color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; }
-        .upload-btn:hover { opacity: 0.9; }
-
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th, td { border: 1px solid var(--bd); padding: 10px; text-align: left; }
-        th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; }
-        .num { text-align: right; }
-        .loading { text-align: center; padding: 20px; font-weight: bold; color: var(--p); }
-        .row-group { background: #fafafa; font-weight: 600; }
+        .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 100%; margin: 0 auto; }
+        
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header-top h1 { font-size: 1.2rem; margin: 0; display: flex; align-items: center; gap: 8px; }
+        .upload-btn { background: var(--p); color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; }
+        
+        .table-wrap { overflow-x: auto; border: 1px solid var(--bd); border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        
+        /* Table Header Styling */
+        th { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; text-align: left; padding: 10px; border: 1px solid var(--bd); font-size: 0.85rem; }
+        td { padding: 8px 10px; border: 1px solid var(--bd); vertical-align: middle; color: #4b5563; }
+        
+        /* Merged Cells Styling (Left side categories) */
+        .grp-cell { background: var(--blue-light); color: var(--blue-dark); font-weight: 600; vertical-align: top; }
+        
+        /* Subtotal Row Styling */
+        .subtotal-row td { background: var(--blue-light); color: var(--blue-dark); font-weight: 700; }
+        .subtotal-label { text-align: left; }
+        
+        .num { text-align: right; font-weight: 600; }
+        .loading { text-align: center; padding: 30px; font-weight: bold; color: var(--p); font-size: 1.1rem; }
     </style>
 </head>
 <body>
@@ -31,7 +39,6 @@
 <div class="card">
     <div class="header-top">
         <h1>🏆 Top 10 Style — Article ke hisaab se</h1>
-        <!-- Yeh raha Upload Page par jane ka button -->
         <a href="upload.html" class="upload-btn">＋ Upload Data</a>
     </div>
     
@@ -49,7 +56,7 @@
                 </tr>
             </thead>
             <tbody id="table-body">
-                <tr><td colspan="7" class="loading" id="statusMsg">Data load ho raha hai...</td></tr>
+                <tr><td colspan="7" class="loading">Data load ho raha hai... Please wait.</td></tr>
             </tbody>
         </table>
     </div>
@@ -66,6 +73,7 @@
     async function loadData() {
         const tbody = document.getElementById('table-body');
         try {
+            // Data fetch kar rahe hain
             const { data, error } = await supabaseClient
                 .from('top_10_styles')
                 .select('*');
@@ -76,27 +84,64 @@
                 return;
             }
 
-            let html = '';
-            let currentArticle = null;
+            // Data ko Group karne ka logic (Taki Merge aur Subtotal ban sake)
+            let groups = [];
+            let currentKey = null;
+            let currentGroup = null;
+
+            // Ensure data is sorted properly before grouping
+            data.sort((a, b) => {
+                let diff = (a.article_name || '').localeCompare(b.article_name || '');
+                if (diff !== 0) return diff;
+                return (b.sls || 0) - (a.sls || 0);
+            });
 
             data.forEach(row => {
-                let rowClass = '';
-                if (currentArticle !== row.article_name) {
-                    currentArticle = row.article_name;
-                    rowClass = 'row-group';
+                let key = `${row.major_category}|${row.sub_section_name}|${row.article_name}`;
+                if (key !== currentKey) {
+                    currentGroup = {
+                        major_category: row.major_category,
+                        sub_section_name: row.sub_section_name,
+                        article_name: row.article_name,
+                        rows: [],
+                        subtotal_sls: 0,
+                        subtotal_cbs: 0
+                    };
+                    groups.push(currentGroup);
+                    currentKey = key;
                 }
+                currentGroup.rows.push(row);
+                currentGroup.subtotal_sls += (row.sls || 0);
+                currentGroup.subtotal_cbs += (row.cbs || 0);
+            });
 
-                html += `
-                    <tr class="${rowClass}">
-                        <td>${row.major_category || '-'}</td>
-                        <td>${row.sub_section_name || '-'}</td>
-                        <td>${row.article_name || '-'}</td>
-                        <td>${row.brand_name || '-'}</td>
-                        <td>${row.style_name || '-'}</td>
-                        <td class="num">${row.sls || 0}</td>
-                        <td class="num">${row.cbs || 0}</td>
-                    </tr>
-                `;
+            // HTML Generate karna
+            let html = '';
+            groups.forEach(g => {
+                let rowCount = g.rows.length;
+                
+                g.rows.forEach((r, index) => {
+                    html += `<tr>`;
+                    // Pehli row me Major Category, Sub Section aur Article ko Merge (rowspan) kar do
+                    if (index === 0) {
+                        html += `<td rowspan="${rowCount}" class="grp-cell">${g.major_category || '-'}</td>`;
+                        html += `<td rowspan="${rowCount}" class="grp-cell">${g.sub_section_name || '-'}</td>`;
+                        html += `<td rowspan="${rowCount}" class="grp-cell">${g.article_name || '-'}</td>`;
+                    }
+                    // Baki columns normally print honge
+                    html += `<td>${r.brand_name || '-'}</td>`;
+                    html += `<td>${r.style_name || '-'}</td>`;
+                    html += `<td class="num">${r.sls || 0}</td>`;
+                    html += `<td class="num">${r.cbs || 0}</td>`;
+                    html += `</tr>`;
+                });
+
+                // Har group ke baad Subtotal row add karna
+                html += `<tr class="subtotal-row">
+                    <td colspan="5" class="subtotal-label">SUBTOTAL</td>
+                    <td class="num">${g.subtotal_sls}</td>
+                    <td class="num">${g.subtotal_cbs}</td>
+                </tr>`;
             });
 
             tbody.innerHTML = html;
