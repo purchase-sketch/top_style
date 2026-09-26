@@ -47,21 +47,22 @@
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // DHYAAN DEIN: Publishable key me '...' ki jagah Supabase se copy karke puri key daalein
     const SUPABASE_URL = 'https://opxkaiksxjuumhgvqtvc.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi'; // <-- 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
+    
+    // Naam supabaseClient kar diya hai taaki error na aaye
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function loadData() {
         const tbody = document.getElementById('table-body');
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('top_10_styles')
                 .select('*');
 
             if (error) throw error;
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="loading">Koi data nahi mila</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">Koi data nahi mila. Pehle data upload karein.</td></tr>';
                 return;
             }
 
