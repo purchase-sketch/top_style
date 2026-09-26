@@ -47,7 +47,7 @@
 
 <div class="card">
     <div class="header-top">
-        <h1>📊 Pivot: Top 10 Style by Article</h1>
+        <h1>📊 Pivot: Top 10 Style Dashboard</h1>
         <div class="btn-group">
             <button class="action-btn btn-excel" onclick="exportExcel()">⬇ Excel</button>
             <button class="action-btn btn-pdf" onclick="exportPDF()">⬇ PDF</button>
@@ -77,6 +77,7 @@
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Article Name ko bhi ab options me daal diya gaya hai
     const ALL_COLS = [
         { id: 'location_alias', label: 'Location Alias' },
         { id: 'section_name', label: 'Section Name' },
@@ -84,6 +85,7 @@
         { id: 'sub_section_name', label: 'Sub Section Name' },
         { id: 'sub_section_2', label: 'Sub Section 2' },
         { id: 'major_category', label: 'Major Category' },
+        { id: 'article_name', label: 'Article Name' },
         { id: 'price_range', label: 'Price Range' },
         { id: 'sub_price_range', label: 'Sub Price Range' },
         { id: 'sub_major_category', label: 'Sub Major Category' },
@@ -97,7 +99,8 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
         const chkContainer = document.getElementById('pivot-checkboxes');
-        const defaults = ['major_category', 'sub_section_name']; 
+        // Default me ab 'Major Category' set kiya hai (Aapko jo chahiye wo automatic tick milega)
+        const defaults = ['major_category']; 
         
         ALL_COLS.forEach(col => {
             const isChecked = defaults.includes(col.id) ? 'checked' : '';
@@ -156,15 +159,22 @@
         }
 
         const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
+        if (checkedBoxes.length === 0) {
+            tbody.innerHTML = '<tr><td class="loading">Kam se kam ek column tick karein!</td></tr>';
+            return;
+        }
+
         const groupCols = checkedBoxes.map(cb => cb.value);
         const groupLabels = checkedBoxes.map(cb => cb.getAttribute('data-label'));
 
-        // Step 1: Article aur Style ke hisaab se saara data sum karna
+        // Step 1: Dynamic columns aur Style Name ke hisaab se saara data sum karna
         let aggregated = {};
         rawData.forEach(row => {
             let keyObj = {};
+            // Jo tick kiya hai sirf wahi group hoga
             groupCols.forEach(col => keyObj[col] = row[col] || '-');
-            keyObj['article_name'] = row.article_name || '-';
+            
+            // Style Name hamesha child rahega
             keyObj['style_name'] = row.style_name || '-';
 
             let keyStr = JSON.stringify(keyObj);
@@ -175,12 +185,11 @@
             aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
         });
 
-        // Step 2: Har Article ko alag-alag parent group me daalna
+        // Step 2: Parent groups banana
         let parentGroups = {};
         Object.values(aggregated).forEach(row => {
             let parentKeyObj = {};
             groupCols.forEach(col => parentKeyObj[col] = row[col]);
-            parentKeyObj['article_name'] = row.article_name;
             
             let parentKeyStr = JSON.stringify(parentKeyObj);
             if (!parentGroups[parentKeyStr]) {
@@ -193,25 +202,26 @@
 
         let finalGroups = Object.values(parentGroups);
         
-        // 3a. INNER SORTING: Har Article ke andar Styles ko Highest Sales to Lowest Sales karna aur sirf Top 10 rakhna
+        // 3a. INNER SORTING: Top 10 Styles Highest to Lowest
         finalGroups.forEach(pg => {
             pg.styles.sort((a, b) => b.sls - a.sls); 
             pg.styles = pg.styles.slice(0, 10); 
         });
 
-        // 3b. OUTER SORTING: Jis Article ka Total Net SLS sabse zyada ho, wo poora group sabse upar
+        // 3b. OUTER SORTING: Highest Total SLS wala Parent Group sabse upar
         finalGroups.sort((a, b) => {
             let diff = b.total_sls - a.total_sls; 
             if (diff !== 0) return diff;
-            return a.keys.article_name.localeCompare(b.keys.article_name);
+            return JSON.stringify(a.keys).localeCompare(JSON.stringify(b.keys));
         });
 
-        // Step 4: Table header aur Rows banana
+        // Step 4: Table header banana
         let headHtml = '<tr>';
         groupLabels.forEach(lbl => headHtml += `<th>${lbl}</th>`);
-        headHtml += `<th>Article Name</th><th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
+        headHtml += `<th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
         thead.innerHTML = headHtml;
 
+        // Step 5: Table Rows banana
         let bodyHtml = '';
         finalGroups.forEach(pg => {
             let rowCount = pg.styles.length;
@@ -219,19 +229,22 @@
 
             pg.styles.forEach((styleRow, index) => {
                 bodyHtml += `<tr>`;
+                
+                // Sirf tick kiye hue columns merge (rowspan) honge
                 if (index === 0) {
                     groupCols.forEach(col => {
                         bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys[col]}</td>`;
                     });
-                    bodyHtml += `<td rowspan="${rowCount}" class="grp-cell">${pg.keys['article_name']}</td>`;
                 }
+                
                 bodyHtml += `<td>${styleRow.style_name}</td>`;
                 bodyHtml += `<td class="num">${styleRow.sls}</td>`;
                 bodyHtml += `<td class="num">${styleRow.cbs}</td>`;
                 bodyHtml += `</tr>`;
             });
 
-            let colspan = groupCols.length + 1; 
+            // Subtotal Line
+            let colspan = groupCols.length; 
             bodyHtml += `<tr class="subtotal-row">
                 <td colspan="${colspan}">SUBTOTAL</td>
                 <td></td>
