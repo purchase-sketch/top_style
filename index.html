@@ -144,7 +144,7 @@
             filterPanel.innerHTML += `
                 <div class="filter-group">
                     <label>${col.label} (Ctrl+Click)</label>
-                    <select id="flt_${col.id}" multiple class="filter-select" onchange="filterDropdownCascading('${col.id}')"></select>
+                    <select id="flt_${col.id}" multiple class="filter-select" onchange="processAndRenderTable()"></select>
                 </div>
             `;
         });
@@ -152,41 +152,28 @@
         await fetchAndRender();
     });
 
-    // Main Fetch Function
+    // Fast RPC Function Data Fetch
     async function fetchAndRender() {
         const msg = document.getElementById('load-msg');
         msg.innerText = "Data load ho raha hai...";
 
-        let query = supabaseClient.from('sales_stock').select('*');
-
-        // Date Range
+        let startD = null, endD = null;
         const dates = fpInstance.selectedDates;
         if (dates.length === 2) {
-            const startD = dates[0].toLocaleDateString('en-CA');
-            const endD = dates[1].toLocaleDateString('en-CA');
-            query = query.gte('report_date', startD).lte('report_date', endD);
+            startD = dates[0].toLocaleDateString('en-CA');
+            endD = dates[1].toLocaleDateString('en-CA');
         }
 
         try {
-            // Fetch All Batching
-            let allRows = [];
-            let from = 0;
-            let step = 1000;
-            let hasMore = true;
+            // Direct RPC Call for Instant aggregated summary
+            const { data, error } = await supabaseClient.rpc('get_pivot_summary', {
+                p_start_date: startD,
+                p_end_date: endD
+            });
 
-            while (hasMore) {
-                let { data, error } = await query.range(from, from + step - 1);
-                if (error) throw error;
-                if (data && data.length > 0) {
-                    allRows = allRows.concat(data);
-                    from += step;
-                    if (data.length < step) hasMore = false;
-                } else {
-                    hasMore = false;
-                }
-            }
+            if (error) throw error;
 
-            rawData = allRows;
+            rawData = data || [];
             populateFilterOptions();
             processAndRenderTable();
         } catch (err) {
@@ -209,10 +196,6 @@
             });
             selectElem.innerHTML = html;
         });
-    }
-
-    function filterDropdownCascading(changedCol) {
-        processAndRenderTable();
     }
 
     function resetFilters() {
@@ -249,15 +232,7 @@
             return;
         }
 
-        // 2. Determine max date for CBS Stock calculation
-        let maxDate = '';
-        filteredData.forEach(r => {
-            if (r.report_date && r.report_date > maxDate) {
-                maxDate = r.report_date;
-            }
-        });
-
-        // 3. Checked Pivot Boxes
+        // 2. Checked Pivot Boxes
         const checkedBoxes = Array.from(document.querySelectorAll('.pivot-chk:checked'));
         if (checkedBoxes.length === 0) {
             tbody.innerHTML = '<tr><td class="loading">Kam se kam ek Box Tick karein!</td></tr>';
@@ -268,7 +243,7 @@
         const groupCols = checkedBoxes.map(cb => cb.value);
         const groupLabels = checkedBoxes.map(cb => cb.getAttribute('data-label'));
 
-        // 4. Aggregation
+        // 3. Aggregation
         let aggregated = {};
         filteredData.forEach(row => {
             let keyObj = {};
@@ -279,15 +254,11 @@
             if (!aggregated[keyStr]) {
                 aggregated[keyStr] = { ...keyObj, sls: 0, cbs: 0 };
             }
-            // SLS is summed across all filtered dates
             aggregated[keyStr].sls += Number(row.net_sls_qty) || 0;
-            // CBS is taken ONLY from the latest report_date
-            if (row.report_date === maxDate) {
-                aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
-            }
+            aggregated[keyStr].cbs += Number(row.cbs_qty) || 0;
         });
 
-        // 5. Parent Grouping
+        // 4. Parent Grouping
         let parentGroups = {};
         Object.values(aggregated).forEach(row => {
             let parentKeyObj = {};
@@ -304,26 +275,26 @@
 
         let finalGroups = Object.values(parentGroups);
 
-        // 6. Sort inner Top 10 by SLS
+        // 5. Sort inner Top 10 by SLS
         finalGroups.forEach(pg => {
             pg.styles.sort((a, b) => b.sls - a.sls);
             pg.styles = pg.styles.slice(0, 10);
         });
 
-        // 7. Sort parent groups by Highest Total SLS
+        // 6. Sort parent groups by Highest Total SLS
         finalGroups.sort((a, b) => {
             let diff = b.total_sls - a.total_sls;
             if (diff !== 0) return diff;
             return JSON.stringify(a.keys).localeCompare(JSON.stringify(b.keys));
         });
 
-        // 8. Render Header
+        // 7. Render Header
         let headHtml = '<tr>';
         groupLabels.forEach(lbl => headHtml += `<th>${lbl}</th>`);
         headHtml += `<th>Style Name</th><th class="num">Net SLS Qty</th><th class="num">CBS Qty</th></tr>`;
         thead.innerHTML = headHtml;
 
-        // 9. Render Rows
+        // 8. Render Rows
         let bodyHtml = '';
         finalGroups.forEach(pg => {
             let rowCount = pg.styles.length;
