@@ -122,6 +122,15 @@
         panel.style.display = (panel.style.display === 'grid') ? 'none' : 'grid';
     }
 
+    // Date ko YYYY-MM-DD me convert karne ka safe helper
+    function formatDateToYYYYMMDD(d) {
+        if (!d) return null;
+        let year = d.getFullYear();
+        let month = String(d.getMonth() + 1).padStart(2, '0');
+        let day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
         fpInstance = flatpickr("#dateRange", { mode: "range", dateFormat: "Y-m-d" });
 
@@ -159,13 +168,15 @@
 
         let startD = null, endD = null;
         const dates = fpInstance.selectedDates;
-        if (dates.length === 2) {
-            startD = dates[0].toLocaleDateString('en-CA');
-            endD = dates[1].toLocaleDateString('en-CA');
+        
+        // Strict Date Formatting Fix
+        if (dates.length >= 1) {
+            startD = formatDateToYYYYMMDD(dates[0]);
+            endD = dates.length === 2 ? formatDateToYYYYMMDD(dates[1]) : startD;
         }
 
         try {
-            // Direct RPC Call for Instant aggregated summary
+            // Direct RPC Call with properly formatted YYYY-MM-DD dates
             const { data, error } = await supabaseClient.rpc('get_pivot_summary', {
                 p_start_date: startD,
                 p_end_date: endD
@@ -211,7 +222,7 @@
         const thead = document.getElementById('table-head');
 
         if (!rawData || rawData.length === 0) {
-            tbody.innerHTML = '<tr><td class="loading">Koi data nahi mila. Upload karein.</td></tr>';
+            tbody.innerHTML = '<tr><td class="loading">Koi data nahi mila. Date check karein ya Upload karein.</td></tr>';
             thead.innerHTML = '';
             return;
         }
