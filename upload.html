@@ -27,10 +27,11 @@
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // DHYAAN DEIN: Publishable key me '...' ki jagah Supabase se copy karke puri key daalein
     const SUPABASE_URL = 'https://opxkaiksxjuumhgvqtvc.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi'; // <-
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
+    
+    // Yahan bhi supabaseClient kar diya hai
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function uploadData() {
         const btn = document.getElementById('uploadBtn');
@@ -80,7 +81,7 @@
         }
 
         try {
-            const { error } = await supabase.from('sales_stock').insert(insertData);
+            const { error } = await supabaseClient.from('sales_stock').insert(insertData);
             if (error) throw error;
             
             status.textContent = `✅ Success! ${insertData.length} records upload ho gaye.`;
