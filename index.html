@@ -10,7 +10,13 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tx); padding: 20px; }
         .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 1200px; margin: 0 auto; }
-        h1 { font-size: 1.5rem; margin-bottom: 20px; border-bottom: 2px solid var(--bd); padding-bottom: 10px; }
+        
+        /* Naya header style banaya gaya hai jisme Upload button hai */
+        .header-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--bd); padding-bottom: 10px; margin-bottom: 20px; }
+        .header-top h1 { font-size: 1.5rem; margin: 0; padding: 0; border: none; }
+        .upload-btn { background: var(--p); color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; }
+        .upload-btn:hover { opacity: 0.9; }
+
         .table-wrap { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         th, td { border: 1px solid var(--bd); padding: 10px; text-align: left; }
@@ -23,7 +29,12 @@
 <body>
 
 <div class="card">
-    <h1>🏆 Top 10 Style — Article ke hisaab se</h1>
+    <div class="header-top">
+        <h1>🏆 Top 10 Style — Article ke hisaab se</h1>
+        <!-- Yeh raha Upload Page par jane ka button -->
+        <a href="upload.html" class="upload-btn">＋ Upload Data</a>
+    </div>
+    
     <div class="table-wrap">
         <table>
             <thead>
@@ -50,7 +61,6 @@
     const SUPABASE_URL = 'https://opxkaiksxjuumhgvqtvc.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
     
-    // Naam supabaseClient kar diya hai taaki error na aaye
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function loadData() {
@@ -62,7 +72,7 @@
 
             if (error) throw error;
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="loading">Koi data nahi mila. Pehle data upload karein.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">Koi data nahi mila. Upar "Upload Data" par click karein.</td></tr>';
                 return;
             }
 
