@@ -33,12 +33,12 @@
     const SUPABASE_KEY = 'sb_publishable_7Go66siqXlHsuEprgi-OUQ_LrolVyUi';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Date Format Converter (DD-MM-YY / DD-MM-YYYY / DD/MM/YYYY to YYYY-MM-DD)
+    // Strict Date Format Converter
     function parseDateToISO(dateStr) {
-        if (!dateStr) return null;
+        if (!dateStr || dateStr.trim() === '' || dateStr.trim() === '0') return null;
         dateStr = dateStr.trim();
         
-        // Agar pehle se YYYY-MM-DD hai
+        // YYYY-MM-DD
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
 
         // Splitting by '-', '/', or '.'
@@ -48,17 +48,15 @@
             let month = parts[1].padStart(2, '0');
             let year = parts[2];
 
-            // 2-digit year (jaise 26) ko 2026 banana
             if (year.length === 2) {
                 year = '20' + year;
             }
 
-            // Return in YYYY-MM-DD format
             if (year.length === 4) {
                 return `${year}-${month}-${day}`;
             }
         }
-        return dateStr; // fallback
+        return null; // Agar date invalid/0 ho toh null bhejega
     }
 
     async function uploadData() {
@@ -86,9 +84,10 @@
             
             if (cols.length < 18) continue; 
 
-            // Date Convert Kar Rahe Hain
+            // Date Cleaning
             let parsedDate = parseDateToISO(cols[17]);
-
+            
+            // Agar date invalid hai toh entry skip mat karo, bas date null chali jayegi
             insertData.push({
                 location_alias: cols[0],
                 section_name: cols[1],
